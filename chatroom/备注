@@ -1,0 +1,13 @@
+参考文献：
+https://blog.csdn.net/One_of_them/article/details/81633721      Python中非阻塞socket
+https://docs.python.org/zh-cn/3/howto/sockets.html              套接字编程指南
+https://jianshu.com/p/95b1405dade4                              Python实现socket的非阻塞式编程
+https://www.cnblogs.com/madsnotes/articles/5688681.html         python模块 信号
+https://www.cnblogs.com/vamei/archive/2012/10/04/2711818.html   linux信号基础
+https://blog.csdn.net/songlh1234/article/details/83316468       Python读取配置文件(config.ini)，写入配置文件
+https://blog.csdn.net/HFZeng/article/details/93843442           socket中的listen()参数(数字)到底代表什么？
+
+git参考
+https://github.com/11ze/The-chat-room.git
+https://github.com/Hurray0/Python-Chatroom.git
+https://github.com/FlyAndNotDown/ChatRoom.git
