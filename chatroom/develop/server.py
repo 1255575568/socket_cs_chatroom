@@ -5,6 +5,7 @@ import os
 import threading
 import queue
 import json
+import time
 from until.logger import Logger
 
 # 读取配置文件
@@ -32,6 +33,20 @@ class ChatServer(threading.Thread):
         self.ADDR = (config.get('server', 'host'), port)
         os.chdir(sys.path[0])
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    def run(self):
+        self.s.bind(self.ADDR)
+        self.s.listen(5)
+        log.info('聊天服务器开启 ' + str(self.ADDR))
+        # 这里开启一个新的线程 将数据发送给所有用户
+        q = threading.Thread(target=self.sendData)
+        q.start()
+        while True:
+            conn, addr = self.s.accept()
+            # 接收服务端数据
+            t = threading.Thread(target=self.tcp_connect, args=(conn, addr))
+            t.start()
+        self.s.close()
 
     # 用于接收所有客户端发送信息的函数
     def tcp_connect(self, conn, addr):
@@ -107,23 +122,83 @@ class ChatServer(threading.Thread):
                         except:
                             pass
 
+    ################################################################
+
+
+class FileServer(threading.Thread):
+    def __init__(self, port):
+        threading.Thread.__init__(self)
+        self.ADDR = (config.get('server', 'host'), port)
+        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.path = r'.\file'
+        os.chdir(self.path)  # 将file设置当前路径
+
     def run(self):
+        log.info('文件服务器开启 ' + str(self.ADDR))
         self.s.bind(self.ADDR)
         self.s.listen(5)
-        log.info('聊天服务器开启 '+str(self.ADDR))
-        # 这里开启一个新的线程 将数据发送给所有用户
-        q = threading.Thread(target=self.sendData)
-        q.start()
         while True:
-            conn, addr = self.s.accept()
-            # 接收服务端数据
+            conn, addr = self.s.accept()  # 获取客户端的链接和地址
             t = threading.Thread(target=self.tcp_connect, args=(conn, addr))
             t.start()
         self.s.close()
 
-    ################################################################
+    def tcp_connect(self, conn, addr):
+        log.info(str(addr) + '连接文件服务器')
+        while True:
+            data = conn.recv(1024)
+            data = data.decode()
+            print(data)
+            if data == 'quit':
+                log.info(str(addr) + '断开连接')
+                break
+            order = data.split(' ')[0]
+            self.recv_switch(order, data, conn)
+
+    def recv_switch(self, order, msg, conn):
+        if order == 'get':
+            return self.sendFile(msg, conn)
+        elif order == 'put':
+            return self.recvFile(msg, conn)
+        elif order == 'dir':
+            return self.sendList(conn)
+
+    def sendFile(self, msg, conn):
+        name = msg.split()[1]
+        fileName = r'./' + name
+        with open(fileName, 'rb') as f:
+            while True:
+                a = f.read(1024)
+                if not a:
+                    break
+                conn.send(a)
+        time.sleep(0.1)  # 延时确保文件发送完整
+        conn.send('EOF'.encode())
+
+    def recvFile(self,msg, conn):
+        name = msg.split()[1]                              # 获取文件名
+        fileName = r'./' + name
+        with open(fileName, 'wb') as f:
+            while True:
+                data = conn.recv(1024)
+                if data == 'EOF'.encode():
+                    break
+                f.write(data)
+
+    def sendList(self, conn):
+        listdir = os.listdir(os.getcwd())
+        listdir = json.dumps(listdir)
+        conn.sendall(listdir.encode())
+
+
+def startServer():
+    chat_server = ChatServer(int(config.get('server', 'chatPort')))
+    chat_server.start()
+    file_server = FileServer(int(config.get('server', 'filePort')))
+    file_server.start()
+    # img_server = ImgServer(int(config.get('server', 'imgPort')))
+    # img_server.start()
 
 
 if __name__ == '__main__':
-    cserver = ChatServer(int(config.get('server', 'port')))
-    cserver.start()
+    startServer()

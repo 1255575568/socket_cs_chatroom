@@ -1,9 +1,11 @@
 import socket
+import time
 import threading
 import json  # json.dumps(some)打包   json.loads(some)解包
 import tkinter
 import tkinter.messagebox
 from tkinter.scrolledtext import ScrolledText  # 导入多行文本框用到的包
+from tkinter import filedialog
 import configparser
 
 # 读取配置文件
@@ -25,7 +27,7 @@ root1['width'] = 270
 root1.resizable(0, 0)  # 限制窗口大小
 
 IP1 = tkinter.StringVar()
-addr = config.get('server', 'host') + ':' + config.get('server', 'port')
+addr = config.get('server', 'host') + ':' + config.get('server', 'chatPort')
 IP1.set(addr)  # 默认显示的ip和端口
 User = tkinter.StringVar()
 User.set('')
@@ -300,18 +302,136 @@ def recv():
                         listbox.insert(tkinter.END, data1, 'green')  # END将信息加在最后一行
                     if len(data) == 4:
                         listbox.insert(tkinter.END, '\n' + data[3], 'pink')
-                elif data3 == 'Robot' and data2 == user:
-                    print('Here:Robot')
-                    apikey = 'ee19328107fa41e987a42a064a68d0da'
-                    url = 'http://openapi.tuling123.com/openapi/api/v2'
-                    print('msg = ', data1)
-                    listbox.insert(tkinter.END, data1, 'blue')
-                    # reply = call_robot(url, apikey, data1.split('：')[1])
-                    # reply_txt = '\nRobot:' + reply['results'][0]['values']['text']
-                    # listbox.insert(tkinter.END, reply_txt, 'pink')
                 elif data2 == user or data3 == user:  # 显示私聊
                     listbox.insert(tkinter.END, data1, 'red')  # END将信息加在最后一行
             listbox.see(tkinter.END)  # 显示在最后
+
+
+# 将图片上传到图片服务端的缓存文件夹中
+def fileClient():
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect((IP, int(config.get('server', 'filePort'))))
+    # 修改root窗口大小显示文件管理的组件
+    root['height'] = 390
+    root['width'] = 760
+    # 创建列表框
+    list2 = tkinter.Listbox(root)
+    list2.place(x=580, y=25, width=175, height=325)
+
+    # 将接收到的目录文件列表打印出来(dir), 显示在列表框中, 在pwd函数中调用
+    def recvList(enter, lu):
+        s.send(enter.encode())
+        data = s.recv(4096)
+        data = json.loads(data.decode())
+        print(data)
+        list2.delete(0, tkinter.END)  # 清空列表框
+        lu = lu.split('\\')
+        if len(lu) != 1:
+            list2.insert(tkinter.END, 'Return to the previous dir')
+            list2.itemconfig(0, fg='green')
+        for i in range(len(data)):
+            list2.insert(tkinter.END, ('' + data[i]))
+            if '.' not in data[i]:
+                list2.itemconfig(tkinter.END, fg='orange')
+            else:
+                list2.itemconfig(tkinter.END, fg='blue')
+
+    # 创建标签显示服务端工作目录
+    def lab():
+        global label
+        data = 'file'
+        try:
+            label.destroy()
+            label = tkinter.Label(root, text=data)
+            label.place(x=580, y=0, )
+        except:
+            label = tkinter.Label(root, text=data)
+            label.place(x=580, y=0, )
+        recvList('dir', data)
+
+
+    # 刚连接上服务端时进行一次面板刷新
+    lab()
+
+    # 接收下载文件(get)
+    def get(message):
+        # print(message)
+        name = message.split(' ')
+        # print(name)
+        name = name[1]  # 获取命令的第二个参数(文件名)
+        # 选择对话框, 选择文件的保存路径
+        fileName = tkinter.filedialog.asksaveasfilename(title='Save file to', initialfile=name)
+        # 如果文件名非空才进行下载
+        if fileName:
+            s.send(message.encode())
+            with open(fileName, 'wb') as f:
+                while True:
+                    data = s.recv(1024)
+                    if data == 'EOF'.encode():
+                        tkinter.messagebox.showinfo(title='Message',
+                                                    message='Download completed!')
+                        break
+                    f.write(data)
+
+    # 创建用于绑定在列表框上的函数
+    def run(*args):
+        indexs = list2.curselection()
+        index = indexs[0]
+        content = list2.get(index)
+        # 如果有一个 . 则为文件
+        if '.' in content:
+            content = 'get ' + content
+            get(content)
+        elif content == 'Return to the previous dir':
+            content = 'cd ..'
+        else:
+            content = 'cd ' + content
+        lab()  # 刷新显示页面
+
+    # 在列表框上设置绑定事件
+    list2.bind('<ButtonRelease-1>', run)
+
+    # 上传客户端所在文件夹中指定的文件到服务端, 在函数中获取文件名, 不用传参数
+    def put():
+        # 选择对话框
+        fileName = tkinter.filedialog.askopenfilename(title='Select upload file')
+        # 如果有选择文件才继续执行
+        if fileName:
+            name = fileName.split('/')[-1]
+            message = 'put ' + name
+            s.send(message.encode())
+            with open(fileName, 'rb') as f:
+                while True:
+                    a = f.read(1024)
+                    if not a:
+                        break
+                    s.send(a)
+                time.sleep(0.1)  # 延时确保文件发送完整
+                s.send('EOF'.encode())
+                tkinter.messagebox.showinfo(title='Message',
+                                            message='Upload completed!')
+        lab()  # 上传成功后刷新显示页面
+
+    # 创建上传按钮, 并绑定上传文件功能
+    upload = tkinter.Button(root, text='Upload file', command=put)
+    upload.place(x=600, y=353, height=30, width=80)
+
+    # 关闭文件管理器, 待完善
+    def closeFile():
+        root['height'] = 390
+        root['width'] = 580
+        # 关闭连接
+        s.send('quit'.encode())
+        s.close()
+
+    # 创建关闭按钮
+    close = tkinter.Button(root, text='Close', command=closeFile)
+    close.place(x=685, y=353, height=30, width=70)
+
+
+# 创建文件按钮
+fBut = tkinter.Button(root, text='File', command=fileClient)
+fBut.place(x=185, y=320, width=60, height=30)
 
 
 r = threading.Thread(target=recv)
