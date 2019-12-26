@@ -5,6 +5,7 @@ import tkinter
 import tkinter.messagebox
 from tkinter.scrolledtext import ScrolledText  # 导入多行文本框用到的包
 import configparser
+from tkinter import *
 
 # 读取配置文件
 config = configparser.ConfigParser()
@@ -20,9 +21,15 @@ chat = '------Group chat-------'  # 聊天对象, 默认为群聊
 # 登陆窗口
 root1 = tkinter.Tk()
 root1.title('Log in')
-root1['height'] = 110
-root1['width'] = 270
+root1['height'] = 120
+root1['width'] = 300
+# 获取屏幕尺寸以计算布局参数，使窗口居屏幕中央
+screenwidth = root1.winfo_screenwidth()
+screenheight = root1.winfo_screenheight()
+alignstr = '%dx%d+%d+%d' % (root1['width'], root1['height'], (screenwidth - root1['width'])/2, (screenheight - root1['height'])/2)
+root1.geometry(alignstr)
 root1.resizable(0, 0)  # 限制窗口大小
+Label(root1, bg='#F0FFFF', width=300,height=120).pack()
 
 IP1 = tkinter.StringVar()
 addr = config.get('server', 'host') + ':' + config.get('server', 'port')
@@ -82,6 +89,10 @@ root = tkinter.Tk()
 root.title(user)  # 窗口命名为用户名
 root['height'] = 400
 root['width'] = 580
+screenwidth2 = root.winfo_screenwidth()
+screenheight2 = root.winfo_screenheight()
+alignstr2 = '%dx%d+%d+%d' % (root['width'], root['height'], (screenwidth2 - root['width'])/2, (screenheight2 - root['height'])/2)
+root.geometry(alignstr2)
 root.resizable(0, 0)  # 限制窗口大小
 
 # 创建多行文本框
